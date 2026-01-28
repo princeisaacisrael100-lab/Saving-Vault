@@ -33,6 +33,20 @@ export const SavingsVault: React.FC = () => {
   const [canWithdrawNow, setCanWithdrawNow] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('vault-theme');
+    return (saved as 'light' | 'dark') || 'dark';
+  });
+
+  // Apply theme to body
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('vault-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   // Check login status on mount and when app focuses
   useEffect(() => {
@@ -290,7 +304,12 @@ export const SavingsVault: React.FC = () => {
     <div className="vault-app">
       <header className="app-header">
         <h1>SavingsVault</h1>
-        {refreshing && <span className="refresh-loader">Refreshing...</span>}
+        <div className="header-actions">
+          {refreshing && <span className="refresh-loader">Refreshing...</span>}
+          <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle Theme">
+            {theme === 'light' ? '🌙' : '☀️'}
+          </button>
+        </div>
       </header>
 
       <main className="app-content">
@@ -471,7 +490,7 @@ export const SavingsVault: React.FC = () => {
         .vault-app {
           max-width: 900px;
           margin: 0 auto;
-          color: #f8fafc;
+          color: var(--text-primary);
           text-align: left;
         }
 
@@ -484,26 +503,52 @@ export const SavingsVault: React.FC = () => {
 
         .app-header h1 {
           font-size: 2.5rem;
-          background: linear-gradient(135deg, #6366f1, #a855f7);
+          background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           margin: 0;
         }
 
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 1.5rem;
+        }
+
+        .theme-toggle {
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          font-size: 1.25rem;
+          width: 40px;
+          height: 40px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          cursor: pointer;
+          transition: all 0.2s;
+          padding: 0;
+        }
+
+        .theme-toggle:hover {
+          transform: rotate(15deg) scale(1.1);
+          border-color: var(--accent-primary);
+        }
+
         .refresh-loader {
           font-size: 0.875rem;
-          color: #94a3b8;
+          color: var(--text-secondary);
           animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
 
         .card {
-          background: #1e293b;
+          background: var(--bg-card);
           border-radius: 16px;
           padding: 1.5rem;
-          border: 1px solid #334155;
+          border: 1px solid var(--border-color);
           margin-bottom: 1.5rem;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: transform 0.2s, box-shadow 0.2s, background-color 0.3s, border-color 0.3s;
         }
 
         .card:hover {
@@ -513,7 +558,7 @@ export const SavingsVault: React.FC = () => {
         .card h2 {
           margin-top: 0;
           font-size: 1.25rem;
-          color: #e2e8f0;
+          color: var(--text-primary);
           margin-bottom: 1.25rem;
         }
 
@@ -524,17 +569,18 @@ export const SavingsVault: React.FC = () => {
 
         input, select {
           flex: 1;
-          background: #0f172a;
-          border: 1px solid #334155;
+          background: var(--bg-input);
+          border: 1px solid var(--border-color);
           border-radius: 8px;
           padding: 0.75rem 1rem;
-          color: white;
+          color: var(--text-primary);
           font-size: 1rem;
           outline: none;
+          transition: all 0.2s;
         }
 
         input:focus {
-          border-color: #6366f1;
+          border-color: var(--accent-primary);
         }
 
         .dashboard-grid {
@@ -553,7 +599,7 @@ export const SavingsVault: React.FC = () => {
         .stat-item label, .info-item label, .form-group label {
           display: block;
           font-size: 0.75rem;
-          color: #94a3b8;
+          color: var(--text-secondary);
           text-transform: uppercase;
           letter-spacing: 0.05em;
           margin-bottom: 0.5rem;
@@ -562,15 +608,15 @@ export const SavingsVault: React.FC = () => {
         .stat-item .value {
           font-size: 1.5rem;
           font-weight: 700;
-          color: #f8fafc;
+          color: var(--text-primary);
         }
 
         .stat-item .value.highlight {
-          color: #818cf8;
+          color: var(--accent-primary);
         }
 
-        .value.success { color: #4ade80; }
-        .value.pending { color: #fbbf24; }
+        .value.success { color: var(--success); }
+        .value.pending { color: var(--warning); }
 
         .action-buttons {
           display: grid;
@@ -584,14 +630,20 @@ export const SavingsVault: React.FC = () => {
           font-weight: 600;
           padding: 0.75rem;
           border-radius: 8px;
-          transition: filter 0.2s;
+          transition: filter 0.2s, transform 0.1s;
+          cursor: pointer;
         }
 
-        .primary-btn { background: #6366f1; color: white; width: auto; min-width: 100px; }
-        .deposit-btn { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; margin-top: 1rem; }
-        .claim-btn { background: #334155; color: #e2e8f0; border: 1px solid #475569; }
-        .withdraw-btn { background: #818cf8; color: white; }
-        .danger-btn { background: #ef4444; color: white; }
+        .primary-btn:active, .deposit-btn:active, .claim-btn:active, .withdraw-btn:active, .danger-btn:active {
+          transform: scale(0.98);
+        }
+
+        .primary-btn { background: var(--accent-primary); color: white; width: auto; min-width: 100px; }
+        .deposit-btn { background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); color: white; margin-top: 1rem; }
+        .claim-btn { background: var(--bg-app); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .withdraw-btn { background: var(--accent-primary); color: white; opacity: 0.9; }
+        .withdraw-btn:hover { opacity: 1; }
+        .danger-btn { background: var(--danger); color: white; }
 
         .form-group { margin-bottom: 1rem; }
 
@@ -603,8 +655,9 @@ export const SavingsVault: React.FC = () => {
         }
 
         .warning-badge {
-          background: #7f1d1d;
-          color: #fecaca;
+          background: var(--danger);
+          opacity: 0.8;
+          color: white;
           font-size: 0.75rem;
           padding: 0.25rem 0.625rem;
           border-radius: 9999px;
@@ -612,7 +665,7 @@ export const SavingsVault: React.FC = () => {
         }
 
         .emergency-card p {
-          color: #94a3b8;
+          color: var(--text-secondary);
           font-size: 0.875rem;
           margin-bottom: 1.5rem;
         }
@@ -622,8 +675,8 @@ export const SavingsVault: React.FC = () => {
           font-weight: 600;
         }
 
-        .info-item span.success { color: #4ade80; }
-        .info-item span.warning { color: #f87171; }
+        .info-item span.success { color: var(--success); }
+        .info-item span.warning { color: var(--danger); }
 
         @keyframes pulse {
           0%, 100% { opacity: 1; }
@@ -634,6 +687,7 @@ export const SavingsVault: React.FC = () => {
           .dashboard-grid { grid-template-columns: 1fr; }
         }
       `}</style>
+
     </div>
   );
 };

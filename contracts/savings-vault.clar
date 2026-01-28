@@ -14,6 +14,7 @@
 (define-constant err-minimum-not-met (err u108))
 
 ;; Constants for calculations
+
 (define-constant basis-points u10000)
 (define-constant blocks-per-year u52560) ;; Approximately 144 blocks/day * 365 days
 (define-constant min-lock-blocks u144) ;; Minimum 1 day lock
@@ -34,7 +35,7 @@
     balance: uint,
     deposit-block: uint,
     lock-period: uint,
-    last-interest-claim: uint
+    last-interest-claim: uint,
   }
 )
 
@@ -43,7 +44,7 @@
   {
     total-deposited: uint,
     total-withdrawn: uint,
-    total-interest-earned: uint
+    total-interest-earned: uint,
   }
 )
 
@@ -62,15 +63,14 @@
 ;; Calculate pending interest for a user
 (define-read-only (calculate-interest (user principal))
   (match (map-get? user-savings user)
-    savings
-    (let
-      (
+    savings (let (
         (balance (get balance savings))
         (last-claim (get last-interest-claim savings))
         (blocks-elapsed (- block-height last-claim))
         ;; Interest = (balance * rate * blocks) / (basis-points * blocks-per-year)
         (interest (/ (* (* balance (var-get annual-interest-rate)) blocks-elapsed)
-                    (* basis-points blocks-per-year)))
+          (* basis-points blocks-per-year)
+        ))
       )
       (ok interest)
     )
@@ -81,11 +81,7 @@
 ;; Check if user can withdraw
 (define-read-only (can-withdraw (user principal))
   (match (map-get? user-savings user)
-    savings
-    (let
-      (
-        (unlock-block (+ (get deposit-block savings) (get lock-period savings)))
-      )
+    savings (let ((unlock-block (+ (get deposit-block savings) (get lock-period savings))))
       (ok (>= block-height unlock-block))
     )
     (ok false)
@@ -95,8 +91,7 @@
 ;; Get unlock block height for a user
 (define-read-only (get-unlock-block (user principal))
   (match (map-get? user-savings user)
-    savings
-    (ok (+ (get deposit-block savings) (get lock-period savings)))
+    savings (ok (+ (get deposit-block savings) (get lock-period savings)))
     err-not-found
   )
 )
@@ -109,7 +104,7 @@
     total-deposits: (var-get total-deposits),
     contract-paused: (var-get contract-paused),
     total-interest-paid: (var-get total-interest-paid),
-    contract-balance: (stx-get-balance (as-contract tx-sender))
+    contract-balance: (stx-get-balance (as-contract tx-sender)),
   })
 )
 
@@ -126,17 +121,23 @@
 ;; Private functions
 
 ;; Update user stats
-(define-private (update-user-stats (user principal) (deposit uint) (withdrawn uint) (interest uint))
-  (let
-    (
-      (current-stats (default-to 
-        {total-deposited: u0, total-withdrawn: u0, total-interest-earned: u0}
-        (map-get? user-stats user)))
-    )
+(define-private (update-user-stats
+    (user principal)
+    (deposit uint)
+    (withdrawn uint)
+    (interest uint)
+  )
+  (let ((current-stats (default-to {
+      total-deposited: u0,
+      total-withdrawn: u0,
+      total-interest-earned: u0,
+    }
+      (map-get? user-stats user)
+    )))
     (map-set user-stats user {
       total-deposited: (+ (get total-deposited current-stats) deposit),
       total-withdrawn: (+ (get total-withdrawn current-stats) withdrawn),
-      total-interest-earned: (+ (get total-interest-earned current-stats) interest)
+      total-interest-earned: (+ (get total-interest-earned current-stats) interest),
     })
   )
 )
@@ -144,20 +145,19 @@
 ;; Claim interest internal function
 (define-private (claim-interest-internal (user principal))
   (match (map-get? user-savings user)
-    savings
-    (match (calculate-interest user)
-      interest
-      (if (> interest u0)
+    savings (match (calculate-interest user)
+      interest (if (> interest u0)
         (begin
           ;; Update last claim block
           (map-set user-savings user
-            (merge savings {last-interest-claim: block-height})
+            (merge savings { last-interest-claim: block-height })
           )
           ;; Transfer interest
           (match (as-contract (stx-transfer? interest tx-sender user))
-            success
-            (begin
-              (var-set total-interest-paid (+ (var-get total-interest-paid) interest))
+            success (begin
+              (var-set total-interest-paid
+                (+ (var-get total-interest-paid) interest)
+              )
               (update-user-stats user u0 u0 interest)
               (ok interest)
             )
@@ -175,9 +175,11 @@
 ;; Public functions
 
 ;; Deposit STX with a lock period
-(define-public (deposit (amount uint) (lock-period uint))
-  (let
-    (
+(define-public (deposit
+    (amount uint)
+    (lock-period uint)
+  )
+  (let (
       (user tx-sender)
       (existing-savings (map-get? user-savings user))
     )
@@ -186,7 +188,7 @@
     (asserts! (>= amount (var-get minimum-deposit)) err-minimum-not-met)
     (asserts! (>= lock-period min-lock-blocks) err-invalid-lock-period)
     (asserts! (<= lock-period max-lock-blocks) err-invalid-lock-period)
-    
+
     ;; If user already has savings, claim interest first
     (match existing-savings
       savings
@@ -197,7 +199,7 @@
           balance: (+ (get balance savings) amount),
           deposit-block: block-height,
           lock-period: lock-period,
-          last-interest-claim: block-height
+          last-interest-claim: block-height,
         })
       )
       ;; Create new savings account
@@ -205,25 +207,24 @@
         balance: amount,
         deposit-block: block-height,
         lock-period: lock-period,
-        last-interest-claim: block-height
+        last-interest-claim: block-height,
       })
     )
-    
+
     ;; Transfer STX to contract
     (try! (stx-transfer? amount user (as-contract tx-sender)))
-    
+
     ;; Update total deposits and stats
     (var-set total-deposits (+ (var-get total-deposits) amount))
     (update-user-stats user amount u0 u0)
-    
+
     (ok amount)
   )
 )
 
 ;; Withdraw after lock period expires
 (define-public (withdraw)
-  (let
-    (
+  (let (
       (user tx-sender)
       (savings (unwrap! (map-get? user-savings user) err-not-found))
       (balance (get balance savings))
@@ -232,30 +233,27 @@
     ;; Validation checks
     (asserts! (> balance u0) err-insufficient-balance)
     (asserts! (>= block-height unlock-block) err-lock-period-active)
-    
+
     ;; Claim any pending interest
     (try! (claim-interest-internal user))
-    
+
     ;; Update savings (set balance to 0)
-    (map-set user-savings user
-      (merge savings {balance: u0})
-    )
-    
+    (map-set user-savings user (merge savings { balance: u0 }))
+
     ;; Transfer STX back to user
     (try! (as-contract (stx-transfer? balance tx-sender user)))
-    
+
     ;; Update total deposits and stats
     (var-set total-deposits (- (var-get total-deposits) balance))
     (update-user-stats user u0 balance u0)
-    
+
     (ok balance)
   )
 )
 
 ;; Emergency withdrawal with penalty
 (define-public (emergency-withdraw)
-  (let
-    (
+  (let (
       (user tx-sender)
       (savings (unwrap! (map-get? user-savings user) err-not-found))
       (balance (get balance savings))
@@ -264,20 +262,21 @@
     )
     ;; Validation checks
     (asserts! (> balance u0) err-insufficient-balance)
-    
+
     ;; Update savings (set balance to 0)
-    (map-set user-savings user
-      (merge savings {balance: u0})
-    )
-    
+    (map-set user-savings user (merge savings { balance: u0 }))
+
     ;; Transfer STX back to user (minus penalty)
     (try! (as-contract (stx-transfer? withdraw-amount tx-sender user)))
-    
+
     ;; Update total deposits and stats
     (var-set total-deposits (- (var-get total-deposits) balance))
     (update-user-stats user u0 withdraw-amount u0)
-    
-    (ok {withdrawn: withdraw-amount, penalty: penalty})
+
+    (ok {
+      withdrawn: withdraw-amount,
+      penalty: penalty,
+    })
   )
 )
 
@@ -335,8 +334,7 @@
 
 ;; Withdraw excess funds (owner only, cannot withdraw user deposits)
 (define-public (withdraw-excess)
-  (let
-    (
+  (let (
       (contract-balance (stx-get-balance (as-contract tx-sender)))
       (total-locked (var-get total-deposits))
       (excess (- contract-balance total-locked))
