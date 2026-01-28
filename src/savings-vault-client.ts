@@ -103,7 +103,7 @@ export async function emergencyWithdraw(senderKey: string): Promise<string> {
   return broadcastResponse.txid;
 }
 
-/**
+/**  
  * Claim accrued interest
  * @param senderKey - Private key of the sender
  */
@@ -297,7 +297,7 @@ async function example() {
     // Deposit 10 STX for 30 days
     const depositAmount = stxToMicroStx(10);
     const lockPeriod = daysToBlocks(30);
-    const depositTxId = await deposit(senderKey, depositAmount, lockPeriod);
+    const depositTxId = await deposit(senderKey, depositAmount);
     console.log('Deposit successful:', depositTxId);
 
     // Wait for transaction confirmation, then check savings
