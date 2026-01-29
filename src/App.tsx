@@ -1,29 +1,57 @@
 import * as React from 'react';
-
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Connect } from '@stacks/connect-react';
-import { authOptions } from './stacks-config';
+import { authOptions, userSession } from './stacks-config';
 import SavingsVault from './SavingsVaultComponent';
+import LandingPage from './LandingPage';
+import Navbar from './Navbar';
 
 function App() {
+    const [isSignedIn, setIsSignedIn] = React.useState(userSession.isUserSignedIn());
+
+    React.useEffect(() => {
+        const checkAuth = () => {
+            setIsSignedIn(userSession.isUserSignedIn());
+        };
+        checkAuth();
+        window.addEventListener('focus', checkAuth);
+        return () => window.removeEventListener('focus', checkAuth);
+    }, []);
+
     const extendedAuthOptions = {
         ...authOptions,
         onFinish: (payload: any) => {
-            // The session is already saved by the Connect component, 
-            // but we can ensure a clean state by reloading or using state.
-            // For now, reload is safest for the library to sync.
-            setTimeout(() => window.location.reload(), 100);
+            // Updated session state immediately after auth
+            setTimeout(() => {
+                setIsSignedIn(true);
+                window.location.reload();
+            }, 100);
         },
     };
 
     return (
         <Connect authOptions={extendedAuthOptions}>
-            <div className="App">
-                <SavingsVault />
-            </div>
+            <BrowserRouter>
+                <div className="App">
+                    <Navbar />
+                    <Routes>
+                        <Route path="/" element={<LandingPage />} />
+                        <Route
+                            path="/dashboard"
+                            element={
+                                isSignedIn ? (
+                                    <SavingsVault />
+                                ) : (
+                                    <Navigate to="/" replace />
+                                )
+                            }
+                        />
+                    </Routes>
+                </div>
+            </BrowserRouter>
         </Connect>
     );
 }
-
 
 export default App;
 
