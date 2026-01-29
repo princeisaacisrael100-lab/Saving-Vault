@@ -155,9 +155,9 @@ const LandingPage: React.FC = () => {
                 <div className="container">
                     <div className="cta-card glass">
                         <h2>Ready to start saving?</h2>
-                        <p>Join thousands of users who trust SavingsVault with their digital future.</p>
+                        <p>Connect with Xverse, Leather, or any Stacks wallet to begin earning.</p>
                         <button className="btn-primary btn-lg" onClick={handleGetStarted}>
-                            {isSignedIn ? 'Go to Dashboard' : 'Connect Wallet Now'}
+                            {isSignedIn ? 'Go to Dashboard' : 'Connect Wallet'}
                             <ArrowRight size={20} />
                         </button>
                     </div>

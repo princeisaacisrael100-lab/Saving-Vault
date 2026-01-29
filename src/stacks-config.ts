@@ -13,8 +13,9 @@ export const authOptions = {
     appConfig,
     userSession,
     appDetails: {
-        name: 'Stacks Savings Vault',
+        name: 'SavingsVault',
         icon: window.location.origin + '/vite.svg',
     },
+    // This automatically supports all Stacks wallets: Xverse, Leather, Asigna, etc.
 };
 
