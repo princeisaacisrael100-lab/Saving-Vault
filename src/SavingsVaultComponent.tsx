@@ -173,6 +173,12 @@ export const SavingsVault: React.FC = () => {
       return;
     }
 
+    const minAmount = config ? microStxToStx(config.minimumDeposit) : 1;
+    if (parseFloat(depositAmount) < minAmount) {
+      alert(`Minimum deposit is ${minAmount} STX`);
+      return;
+    }
+
     setLoading(true);
     try {
       const amount = stxToMicroStx(parseFloat(depositAmount));
@@ -396,7 +402,7 @@ export const SavingsVault: React.FC = () => {
                   placeholder="0.00"
                   value={depositAmount}
                   onChange={(e) => setDepositAmount(e.target.value)}
-                  min="0.1"
+                  min={config ? microStxToStx(config.minimumDeposit) : 1}
                 />
               </div>
 

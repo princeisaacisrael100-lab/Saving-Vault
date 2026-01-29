@@ -27,12 +27,11 @@ export async function deposit(
   senderKey: string,
   amount: number
 ): Promise<string> {
-  const amountInMicroSTX = Math.floor(price * 1_000_000)
   const txOptions = {
     contractAddress: CONTRACT_ADDRESS,
     contractName: CONTRACT_NAME,
     functionName: 'deposit',
-    functionArgs: [STX(amount)],
+    functionArgs: [uintCV(amount)],
     senderKey,
     network,
     anchorMode: AnchorMode.Any,
