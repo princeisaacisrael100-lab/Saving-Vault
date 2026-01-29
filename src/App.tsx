@@ -22,10 +22,7 @@ function App() {
         ...authOptions,
         onFinish: (payload: any) => {
             // Updated session state immediately after auth
-            setTimeout(() => {
-                setIsSignedIn(true);
-                window.location.reload();
-            }, 100);
+            setIsSignedIn(true);
         },
     };
 

@@ -7,128 +7,128 @@ import { callReadOnlyFunction } from '@stacks/transactions';
 import { standardPrincipalCV, cvToValue } from '@stacks/transactions';
 
 const Navbar: React.FC = () => {
-    const { authenticate } = useConnect();
-    const location = useLocation();
-    const [theme, setTheme] = React.useState<'light' | 'dark'>(() => {
-        const saved = localStorage.getItem('vault-theme');
-        return (saved as 'light' | 'dark') || 'dark';
-    });
-    const [isSignedIn, setIsSignedIn] = React.useState(userSession.isUserSignedIn());
-    const [balance, setBalance] = React.useState<number>(0);
-    const [userAddress, setUserAddress] = React.useState<string>('');
+  const { authenticate } = useConnect();
+  const location = useLocation();
+  const [theme, setTheme] = React.useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('vault-theme');
+    return (saved as 'light' | 'dark') || 'dark';
+  });
+  const [isSignedIn, setIsSignedIn] = React.useState(userSession.isUserSignedIn());
+  const [balance, setBalance] = React.useState<number>(0);
+  const [userAddress, setUserAddress] = React.useState<string>('');
 
-    React.useEffect(() => {
-        document.body.setAttribute('data-theme', theme);
-        localStorage.setItem('vault-theme', theme);
-    }, [theme]);
+  React.useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('vault-theme', theme);
+  }, [theme]);
 
-    // Check auth status and load balance
-    React.useEffect(() => {
-        const checkAuth = async () => {
-            const signedIn = userSession.isUserSignedIn();
-            setIsSignedIn(signedIn);
+  // Check auth status and load balance
+  React.useEffect(() => {
+    const checkAuth = async () => {
+      const signedIn = userSession.isUserSignedIn();
+      setIsSignedIn(signedIn);
 
-            if (signedIn) {
-                const data = userSession.loadUserData();
-                const address = data.profile?.stxAddress?.testnet || data.profile?.stxAddress?.mainnet || data.profile?.stxAddress;
-                if (address) {
-                    setUserAddress(address);
-                    await loadBalance(address);
-                }
-            }
-        };
-        checkAuth();
-        const interval = setInterval(checkAuth, 10000); // Refresh every 10 seconds
-        return () => clearInterval(interval);
-    }, []);
-
-    const loadBalance = async (address: string) => {
-        try {
-            const savingsResult = await callReadOnlyFunction({
-                contractAddress: CONTRACT_ADDRESS,
-                contractName: CONTRACT_NAME,
-                functionName: 'get-user-savings',
-                functionArgs: [standardPrincipalCV(address)],
-                network,
-                senderAddress: address,
-            });
-            const savingsVal = cvToValue(savingsResult);
-            if (savingsVal && savingsVal.value) {
-                setBalance(Number(savingsVal.value.balance.value) / 1_000_000);
-            }
-        } catch (error) {
-            console.error('Error loading balance:', error);
+      if (signedIn) {
+        const data = userSession.loadUserData();
+        const address = data.profile?.stxAddress?.testnet || data.profile?.stxAddress?.mainnet || data.profile?.stxAddress;
+        if (address) {
+          setUserAddress(address);
+          await loadBalance(address);
         }
+      }
     };
+    checkAuth();
+    const interval = setInterval(checkAuth, 10000); // Refresh every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
 
-    const toggleTheme = () => {
-        setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-    };
+  const loadBalance = async (address: string) => {
+    try {
+      const savingsResult = await callReadOnlyFunction({
+        contractAddress: CONTRACT_ADDRESS,
+        contractName: CONTRACT_NAME,
+        functionName: 'get-user-savings',
+        functionArgs: [standardPrincipalCV(address)],
+        network,
+        senderAddress: address,
+      });
+      const savingsVal = cvToValue(savingsResult);
+      if (savingsVal && savingsVal.value) {
+        setBalance(Number(savingsVal.value.balance.value) / 1_000_000);
+      }
+    } catch (error) {
+      console.error('Error loading balance:', error);
+    }
+  };
 
-    const handleAuth = () => {
-        if (isSignedIn) {
-            userSession.signUserOut();
-            window.location.href = '/';
-        } else {
-            authenticate(authOptions);
-        }
-    };
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+  };
 
-    return (
-        <nav className="navbar glass">
-            <div className="nav-container">
-                <Link to="/" className="nav-logo">
-                    <div className="logo-icon">
-                        <ShieldCheck size={28} />
-                    </div>
-                    <span>SavingsVault</span>
-                </Link>
+  const handleAuth = () => {
+    if (isSignedIn) {
+      userSession.signUserOut();
+      window.location.href = '/';
+    } else {
+      authenticate(authOptions);
+    }
+  };
 
-                <div className="nav-links">
-                    <Link to="/" className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}>
-                        <Home size={18} />
-                        <span>Home</span>
-                    </Link>
-                    {isSignedIn && (
-                        <Link to="/dashboard" className={`nav-link ${location.pathname === '/dashboard' ? 'active' : ''}`}>
-                            <LayoutDashboard size={18} />
-                            <span>Dashboard</span>
-                        </Link>
-                    )}
-                </div>
+  return (
+    <nav className="navbar glass">
+      <div className="nav-container">
+        <Link to="/" className="nav-logo">
+          <div className="logo-icon">
+            <ShieldCheck size={28} />
+          </div>
+          <span>SavingsVault</span>
+        </Link>
 
-                {isSignedIn && balance > 0 && (
-                    <div className="nav-balance">
-                        <Wallet size={16} />
-                        <span className="balance-amount">{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} STX</span>
-                    </div>
-                )}
+        <div className="nav-links">
+          <Link to="/" className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}>
+            <Home size={18} />
+            <span>Home</span>
+          </Link>
+          {isSignedIn && (
+            <Link to="/dashboard" className={`nav-link ${location.pathname === '/dashboard' ? 'active' : ''}`}>
+              <LayoutDashboard size={18} />
+              <span>Dashboard</span>
+            </Link>
+          )}
+        </div>
 
-                <div className="nav-actions">
-                    <button className="theme-toggle-btn" onClick={toggleTheme} aria-label="Toggle Theme">
-                        {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-                    </button>
+        {isSignedIn && balance > 0 && (
+          <div className="nav-balance">
+            <Wallet size={16} />
+            <span className="balance-amount">{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} STX</span>
+          </div>
+        )}
 
-                    <button
-                        className={`auth-btn ${isSignedIn ? 'btn-secondary' : 'btn-primary'}`}
-                        onClick={handleAuth}
-                    >
-                        {isSignedIn ? (
-                            <>
-                                <LogOut size={18} />
-                                <span>Sign Out</span>
-                            </>
-                        ) : (
-                            <>
-                                <LogIn size={18} />
-                                <span>Connect Wallet</span>
-                            </>
-                        )}
-                    </button>
-                </div>
-            </div>
+        <div className="nav-actions">
+          <button className="theme-toggle-btn" onClick={toggleTheme} aria-label="Toggle Theme">
+            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+          </button>
 
-            <style>{`
+          <button
+            className={`auth-btn ${isSignedIn ? 'btn-secondary' : 'btn-primary'}`}
+            onClick={handleAuth}
+          >
+            {isSignedIn ? (
+              <>
+                <LogOut size={18} />
+                <span>Sign Out</span>
+              </>
+            ) : (
+              <>
+                <LogIn size={18} />
+                <span>Connect Wallet</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <style>{`
         .navbar {
           position: fixed;
           top: 0;
@@ -261,8 +261,8 @@ const Navbar: React.FC = () => {
           }
         }
       `}</style>
-        </nav>
-    );
+    </nav>
+  );
 };
 
 export default Navbar;

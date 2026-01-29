@@ -78,47 +78,86 @@ export const SavingsVault: React.FC = () => {
     setRefreshing(true);
 
     try {
-      // Get user vault (the actual function in the deployed contract)
+      // 1. Get user savings
       const vaultResult = await callReadOnlyFunction({
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
-        functionName: 'get-vault',
+        functionName: 'get-user-savings',
         functionArgs: [standardPrincipalCV(userAddress)],
         network,
         senderAddress: userAddress,
       });
       const vaultVal = cvToValue(vaultResult);
 
-      if (vaultVal && vaultVal.value) {
-        // The deployed contract stores: balance, lock-until, total-deposited
-        const balance = Number(vaultVal.value.balance.value);
-        const lockUntil = Number(vaultVal.value['lock-until'].value);
-        const currentBlock = 0; // We'll calculate lock status differently
+      if (vaultVal) { // cvToValue returns the object directly for Some, null for None? verifying.
+        // If it returns null/undefined, it means no savings.
+        // Note: cvToValue behavior:
+        // (ok (some ...)) -> ... (unwrapped)
+        // (ok none) -> null
+
+        // Let's print to debug if needed, but assuming standard behavior:
+        const balance = Number(vaultVal.balance);
+        const depositBlock = Number(vaultVal['deposit-block']);
+        const lockPeriod = Number(vaultVal['lock-period']);
 
         setSavings({
-          balance: balance,
-          depositBlock: 0, // Not stored in this contract
-          lockPeriod: 144, // Fixed 1 day lock
-          lastInterestClaim: 0, // This contract doesn't have interest
+          balance,
+          depositBlock,
+          lockPeriod,
+          lastInterestClaim: Number(vaultVal['last-interest-claim']),
         });
 
-        // Check if unlocked (lock-until <= current block height)
-        setCanWithdrawNow(lockUntil <= 0); // If lock-until is 0 or past
-        setPendingInterest(0); // This simple contract doesn't calculate interest
+        // We need current block height to check if withdraw calls will succeed locally 
+        // OR we can use the helper 'can-withdraw'
+        // For now, let's assume we can fetch it or just rely on contract call success.
+        // Actually, let's call 'can-withdraw' helper!
 
-        // Set minimal config
-        setConfig({
-          annualInterestRate: 0, // Simple contract doesn't have interest
-          minimumDeposit: 1000000, // 1 STX minimum (assumed)
-          totalDeposits: balance, // Just show user's balance
-          contractPaused: false,
-          totalInterestPaid: 0,
-          contractBalance: balance,
+        const canWithdrawResult = await callReadOnlyFunction({
+          contractAddress: CONTRACT_ADDRESS,
+          contractName: CONTRACT_NAME,
+          functionName: 'can-withdraw',
+          functionArgs: [standardPrincipalCV(userAddress)],
+          network,
+          senderAddress: userAddress,
         });
+        setCanWithdrawNow(cvToValue(canWithdrawResult));
+
+        // Calculate pending interest
+        const interestResult = await callReadOnlyFunction({
+          contractAddress: CONTRACT_ADDRESS,
+          contractName: CONTRACT_NAME,
+          functionName: 'calculate-interest',
+          functionArgs: [standardPrincipalCV(userAddress)],
+          network,
+          senderAddress: userAddress,
+        });
+        setPendingInterest(Number(cvToValue(interestResult)));
+
       } else {
         setSavings(null);
         setCanWithdrawNow(false);
         setPendingInterest(0);
+      }
+
+      // 2. Get contract config
+      const configResult = await callReadOnlyFunction({
+        contractAddress: CONTRACT_ADDRESS,
+        contractName: CONTRACT_NAME,
+        functionName: 'get-contract-config',
+        functionArgs: [],
+        network,
+        senderAddress: userAddress,
+      });
+      const configVal = cvToValue(configResult);
+      if (configVal) {
+        setConfig({
+          annualInterestRate: Number(configVal['annual-interest-rate']),
+          minimumDeposit: Number(configVal['minimum-deposit']),
+          totalDeposits: Number(configVal['total-deposits']),
+          contractPaused: configVal['contract-paused'],
+          totalInterestPaid: Number(configVal['total-interest-paid']),
+          contractBalance: Number(configVal['contract-balance']),
+        });
       }
 
     } catch (error) {
@@ -143,7 +182,7 @@ export const SavingsVault: React.FC = () => {
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
         functionName: 'deposit',
-        functionArgs: [uintCV(amount)],
+        functionArgs: [uintCV(amount), uintCV(lockPeriod)],
         postConditionMode: PostConditionMode.Allow,
         onFinish: (data) => {
           alert(`✅ Deposit transaction sent!\n\nTransaction ID: ${data.txId}\n\nYour balance will update in 30-60 seconds after the transaction is confirmed on the blockchain. The page will auto-refresh.`);
@@ -181,8 +220,8 @@ export const SavingsVault: React.FC = () => {
       await doContractCall({
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
-        functionName: 'withdraw-all', // The actual function in the deployed contract
-        functionArgs: [], // withdraw-all takes no arguments
+        functionName: 'withdraw', // The actual function in the deployed contract
+        functionArgs: [], // withdraw takes no arguments
         postConditionMode: PostConditionMode.Allow,
         onFinish: (data) => {
           alert(`Withdrawal transaction sent! Transaction ID: ${data.txId}`);
@@ -207,11 +246,47 @@ export const SavingsVault: React.FC = () => {
 
   // Emergency withdraw and claim interest are not supported in this simple contract
   const handleEmergencyWithdraw = async () => {
-    alert('Emergency withdrawal is not available in this contract version.');
+    setLoading(true);
+    try {
+      await doContractCall({
+        contractAddress: CONTRACT_ADDRESS,
+        contractName: CONTRACT_NAME,
+        functionName: 'emergency-withdraw',
+        functionArgs: [],
+        postConditionMode: PostConditionMode.Allow,
+        onFinish: (data) => {
+          alert(`Emergency Withdrawal sent! Tx ID: ${data.txId}`);
+          setLoading(false);
+          setTimeout(() => loadUserData(), 5000);
+        },
+        onCancel: () => setLoading(false),
+      });
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
   };
 
   const handleClaimInterest = async () => {
-    alert('This contract does not support interest rewards.');
+    setLoading(true);
+    try {
+      await doContractCall({
+        contractAddress: CONTRACT_ADDRESS,
+        contractName: CONTRACT_NAME,
+        functionName: 'claim-interest',
+        functionArgs: [],
+        postConditionMode: PostConditionMode.Allow,
+        onFinish: (data) => {
+          alert(`Interest Claim sent! Tx ID: ${data.txId}`);
+          setLoading(false);
+          setTimeout(() => loadUserData(), 5000);
+        },
+        onCancel: () => setLoading(false)
+      });
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
   };
 
   return (
