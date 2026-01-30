@@ -8,38 +8,39 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* Theme variables - Premium Dark */
-  --bg-app: #020617;
-  --bg-card: #0f172a;
-  --bg-input: #1e293b;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --accent-primary: #6366f1;
-  --accent-secondary: #a855f7;
-  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-  --glass-bg: rgba(15, 23, 42, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --success: #10b981;
-  --warning: #f59e0b;
+  /* Theme variables - Premium Green (Dark) */
+  --bg-app: #050b07; /* Very dark green/black */
+  --bg-card: #0f1d14; /* Dark green/slate */
+  --bg-input: #1a2e20;
+  --border-color: rgba(74, 222, 128, 0.1);
+  --text-primary: #f0fdf4;
+  --text-secondary: #86efac;
+  --text-muted: #4ade80; /* Muted green */
+  --accent-primary: #22c55e;
+  --accent-secondary: #4ade80;
+  --accent-gradient: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  --glass-bg: rgba(15, 29, 20, 0.8);
+  --glass-border: rgba(74, 222, 128, 0.15);
+  --success: #22c55e;
+  --warning: #facc15;
   --danger: #ef4444;
   --nav-height: 72px;
 }
 
 [data-theme='light'] {
-  --bg-app: #f8fafc;
+  /* Theme variables - Graywhite (Light) */
+  --bg-app: #f3f4f6; /* Gray 100 */
   --bg-card: #ffffff;
-  --bg-input: #f1f5f9;
-  --border-color: rgba(0, 0, 0, 0.05);
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --accent-primary: #4f46e5;
-  --accent-secondary: #9333ea;
-  --accent-gradient: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%);
-  --glass-bg: rgba(255, 255, 255, 0.8);
-  --glass-border: rgba(0, 0, 0, 0.05);
+  --bg-input: #e5e7eb;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --text-primary: #1f2937; /* Gray 800 */
+  --text-secondary: #4b5563; /* Gray 600 */
+  --text-muted: #9ca3af;
+  --accent-primary: #374151; /* Gray 700 */
+  --accent-secondary: #6b7280; /* Gray 500 */
+  --accent-gradient: linear-gradient(135deg, #374151 0%, #9ca3af 100%);
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(0, 0, 0, 0.08);
   --success: #059669;
   --warning: #d97706;
   --danger: #dc2626;

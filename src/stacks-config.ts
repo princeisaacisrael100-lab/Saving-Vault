@@ -3,11 +3,11 @@ import { StacksTestnet } from '@stacks/network';
 
 export const appConfig = new AppConfig(['store_write', 'publish_data']);
 export const userSession = new UserSession({ appConfig });
-export const network = new StacksTestnet();
+export const network = new StacksTestnet({ url: 'https://api.testnet.hiro.so' });
 
 // UPDATE THIS ADDRESS AFTER DEPLOYING TO TESTNET
 export const CONTRACT_ADDRESS = 'ST3J8N6RRMAXWZXFT450MG6VG19TCME746R2QJW17';
-export const CONTRACT_NAME = 'sadfgs';
+export const CONTRACT_NAME = 'savings-vault-stacks';
 
 export const authOptions = {
     appConfig,

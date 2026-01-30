@@ -14,7 +14,8 @@ import {
   RefreshCcw,
   ChevronRight,
   ShieldCheck,
-  Coins
+  Coins,
+  LogOut
 } from 'lucide-react';
 
 interface UserSavings {
@@ -34,7 +35,8 @@ interface ContractConfig {
 }
 
 export const SavingsVault: React.FC = () => {
-  const { doContractCall } = useConnect();
+  const connectResults = useConnect();
+  const doContractCall = connectResults?.doContractCall;
   const [userAddress, setUserAddress] = useState<string>('');
   const [userData, setUserData] = useState<any>(null);
   const [savings, setSavings] = useState<UserSavings | null>(null);
@@ -50,9 +52,24 @@ export const SavingsVault: React.FC = () => {
       const data = userSession.loadUserData();
       setUserData(data);
       const address = data.profile?.stxAddress?.testnet || data.profile?.stxAddress?.mainnet || data.profile?.stxAddress;
+
+      // STRICT NETWORK CHECK
+      // If address starts with 'SP' it is Mainnet. We are on Testnet.
+      // We must sign them out to clear the stale session.
+      if (address && address.startsWith('SP')) {
+        alert('Validation Failed: You are signed in with a Mainnet account.\n\nWe are automatically signing you out.\n\nPlease sign in again and ensure "Testnet" is selected in your wallet.');
+        userSession.signUserOut();
+        window.location.reload();
+        return;
+      }
+
       if (address) setUserAddress(address);
     }
   }, []);
+
+  // Form states
+  // Notification state
+  const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string, txId?: string } | null>(null);
 
   // Form states
   const [depositAmount, setDepositAmount] = useState<string>('');
@@ -64,14 +81,30 @@ export const SavingsVault: React.FC = () => {
   const daysToBlocks = (days: number): number => Math.floor(days * 144);
   const blocksToDays = (blocks: number): number => Math.floor(blocks / 144);
 
-  // Load user data
-  useEffect(() => {
-    if (userAddress) {
-      loadUserData();
-      const interval = setInterval(loadUserData, 30000);
-      return () => clearInterval(interval);
+  // Helper to safely parse Clarity Values recursively (handles Responses, Optionals, and Tuples)
+  const safeParse = (cv: any): any => {
+    if (!cv) return null;
+
+    // ResponseOk = 7, ResponseErr = 8
+    if (cv.type === 7) return safeParse(cv.value);
+    if (cv.type === 8) return null;
+
+    // OptionalSome = 10, OptionalNone = 9
+    if (cv.type === 10) return safeParse(cv.value);
+    if (cv.type === 9) return null;
+
+    // Tuple = 12
+    if (cv.type === 12) {
+      const data: any = {};
+      for (const key in cv.data) {
+        data[key] = safeParse(cv.data[key]);
+      }
+      return data;
     }
-  }, [userAddress]);
+
+    // Default for leaf types (uint, principal, bool, etc.)
+    return cvToValue(cv);
+  };
 
   const loadUserData = async () => {
     if (!userAddress) return;
@@ -87,15 +120,11 @@ export const SavingsVault: React.FC = () => {
         network,
         senderAddress: userAddress,
       });
-      const vaultVal = cvToValue(vaultResult);
 
-      if (vaultVal) { // cvToValue returns the object directly for Some, null for None? verifying.
-        // If it returns null/undefined, it means no savings.
-        // Note: cvToValue behavior:
-        // (ok (some ...)) -> ... (unwrapped)
-        // (ok none) -> null
+      const vaultVal = safeParse(vaultResult);
 
-        // Let's print to debug if needed, but assuming standard behavior:
+      if (vaultVal) {
+        // Now vaultVal should be a plain JS object
         const balance = Number(vaultVal.balance);
         const depositBlock = Number(vaultVal['deposit-block']);
         const lockPeriod = Number(vaultVal['lock-period']);
@@ -107,20 +136,9 @@ export const SavingsVault: React.FC = () => {
           lastInterestClaim: Number(vaultVal['last-interest-claim']),
         });
 
-        // We need current block height to check if withdraw calls will succeed locally 
-        // OR we can use the helper 'can-withdraw'
-        // For now, let's assume we can fetch it or just rely on contract call success.
-        // Actually, let's call 'can-withdraw' helper!
-
-        const canWithdrawResult = await callReadOnlyFunction({
-          contractAddress: CONTRACT_ADDRESS,
-          contractName: CONTRACT_NAME,
-          functionName: 'can-withdraw',
-          functionArgs: [standardPrincipalCV(userAddress)],
-          network,
-          senderAddress: userAddress,
-        });
-        setCanWithdrawNow(cvToValue(canWithdrawResult));
+        // 'can-withdraw' helper was removed from contract.
+        // We set it to true to enable the button; contract will enforce lock.
+        setCanWithdrawNow(true);
 
         // Calculate pending interest
         const interestResult = await callReadOnlyFunction({
@@ -131,7 +149,7 @@ export const SavingsVault: React.FC = () => {
           network,
           senderAddress: userAddress,
         });
-        setPendingInterest(Number(cvToValue(interestResult)));
+        setPendingInterest(Number(safeParse(interestResult) || 0));
 
       } else {
         setSavings(null);
@@ -143,20 +161,21 @@ export const SavingsVault: React.FC = () => {
       const configResult = await callReadOnlyFunction({
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
-        functionName: 'get-contract-config',
+        functionName: 'get-contract-info',
         functionArgs: [],
         network,
         senderAddress: userAddress,
       });
-      const configVal = cvToValue(configResult);
+
+      const configVal = safeParse(configResult);
       if (configVal) {
         setConfig({
-          annualInterestRate: Number(configVal['annual-interest-rate']),
-          minimumDeposit: Number(configVal['minimum-deposit']),
-          totalDeposits: Number(configVal['total-deposits']),
-          contractPaused: configVal['contract-paused'],
-          totalInterestPaid: Number(configVal['total-interest-paid']),
-          contractBalance: Number(configVal['contract-balance']),
+          annualInterestRate: Number(configVal['annual-interest-rate'] || 0),
+          minimumDeposit: Number(configVal['minimum-deposit'] || 0),
+          totalDeposits: Number(configVal['total-deposits'] || 0),
+          contractPaused: Boolean(configVal['contract-paused']),
+          totalInterestPaid: Number(configVal['total-interest-paid'] || 0),
+          contractBalance: 0,
         });
       }
 
@@ -168,14 +187,15 @@ export const SavingsVault: React.FC = () => {
   };
 
   const handleDeposit = async () => {
+    setNotification(null);
     if (!depositAmount || !lockDays) {
-      alert('Please enter deposit amount and lock period');
+      setNotification({ type: 'error', message: 'Please enter deposit amount and lock period' });
       return;
     }
 
     const minAmount = config ? microStxToStx(config.minimumDeposit) : 1;
     if (parseFloat(depositAmount) < minAmount) {
-      alert(`Minimum deposit is ${minAmount} STX`);
+      setNotification({ type: 'error', message: `Minimum deposit is ${minAmount} STX` });
       return;
     }
 
@@ -185,54 +205,61 @@ export const SavingsVault: React.FC = () => {
       const lockPeriod = daysToBlocks(parseInt(lockDays));
 
       await doContractCall({
+        network,
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
         functionName: 'deposit',
         functionArgs: [uintCV(amount), uintCV(lockPeriod)],
         postConditionMode: PostConditionMode.Allow,
         onFinish: (data) => {
-          alert(`✅ Deposit transaction sent!\n\nTransaction ID: ${data.txId}\n\nYour balance will update in 30-60 seconds after the transaction is confirmed on the blockchain. The page will auto-refresh.`);
+          setNotification({
+            type: 'success',
+            message: 'Deposit transaction sent! Validation takes ~1-3 mins.',
+            txId: data.txId
+          });
           setDepositAmount('');
           setLoading(false);
-          // Poll for updates every 10 seconds for the next 2 minutes
+          // Poll for updates
           let attempts = 0;
           const pollInterval = setInterval(() => {
             loadUserData();
             attempts++;
-            if (attempts >= 12) { // Stop after 2 minutes (12 * 10 seconds)
-              clearInterval(pollInterval);
-            }
+            if (attempts >= 12) clearInterval(pollInterval);
           }, 10000);
-          // Initial refresh after 5 seconds
           setTimeout(() => loadUserData(), 5000);
         },
         onCancel: () => setLoading(false),
       });
     } catch (error) {
       console.error('Deposit error:', error);
-      alert('Deposit failed: ' + error);
+      setNotification({ type: 'error', message: 'Deposit failed: ' + error });
       setLoading(false);
     }
   };
 
   const handleWithdraw = async () => {
+    setNotification(null);
     if (!canWithdrawNow) {
-      alert('Lock period has not expired yet');
+      setNotification({ type: 'error', message: 'Lock period has not expired yet' });
       return;
     }
 
     setLoading(true);
     try {
       await doContractCall({
+        network,
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
-        functionName: 'withdraw', // The actual function in the deployed contract
-        functionArgs: [], // withdraw takes no arguments
+        functionName: 'withdraw',
+        functionArgs: [],
         postConditionMode: PostConditionMode.Allow,
         onFinish: (data) => {
-          alert(`Withdrawal transaction sent! Transaction ID: ${data.txId}`);
+          setNotification({
+            type: 'success',
+            message: 'Withdrawal transaction sent!',
+            txId: data.txId
+          });
           setLoading(false);
-          // Refresh balance after withdrawal
           setTimeout(() => loadUserData(), 5000);
           let attempts = 0;
           const pollInterval = setInterval(() => {
@@ -245,23 +272,28 @@ export const SavingsVault: React.FC = () => {
       });
     } catch (error) {
       console.error('Withdrawal error:', error);
-      alert('Withdrawal failed: ' + error);
+      setNotification({ type: 'error', message: 'Withdrawal failed: ' + error });
       setLoading(false);
     }
   };
 
-  // Emergency withdraw and claim interest are not supported in this simple contract
   const handleEmergencyWithdraw = async () => {
     setLoading(true);
+    setNotification(null);
     try {
       await doContractCall({
+        network,
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
         functionName: 'emergency-withdraw',
         functionArgs: [],
         postConditionMode: PostConditionMode.Allow,
         onFinish: (data) => {
-          alert(`Emergency Withdrawal sent! Tx ID: ${data.txId}`);
+          setNotification({
+            type: 'success',
+            message: 'Emergency Withdrawal sent!',
+            txId: data.txId
+          });
           setLoading(false);
           setTimeout(() => loadUserData(), 5000);
         },
@@ -269,21 +301,28 @@ export const SavingsVault: React.FC = () => {
       });
     } catch (err) {
       console.error(err);
+      setNotification({ type: 'error', message: 'Failed: ' + err });
       setLoading(false);
     }
   };
 
   const handleClaimInterest = async () => {
     setLoading(true);
+    setNotification(null);
     try {
       await doContractCall({
+        network,
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
         functionName: 'claim-interest',
         functionArgs: [],
         postConditionMode: PostConditionMode.Allow,
         onFinish: (data) => {
-          alert(`Interest Claim sent! Tx ID: ${data.txId}`);
+          setNotification({
+            type: 'success',
+            message: 'Interest Claim sent!',
+            txId: data.txId
+          });
           setLoading(false);
           setTimeout(() => loadUserData(), 5000);
         },
@@ -291,6 +330,7 @@ export const SavingsVault: React.FC = () => {
       });
     } catch (err) {
       console.error(err);
+      setNotification({ type: 'error', message: 'Failed: ' + err });
       setLoading(false);
     }
   };
@@ -298,6 +338,30 @@ export const SavingsVault: React.FC = () => {
   return (
     <div className="vault-dashboard animate-fade-in">
       <div className="dashboard-container">
+        {notification && (
+          <div className={`notification-banner ${notification.type} animate-fade-in`}>
+            {notification.type === 'success' ? <ShieldCheck size={20} /> : <AlertTriangle size={20} />}
+            <div className="notification-content">
+              <span className="msg">{notification.message}</span>
+              {notification.txId && (
+                <a
+                  href={`https://explorer.hiro.so/txid/${notification.txId}?chain=testnet`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="tx-link"
+                >
+                  View Transaction <ChevronRight size={12} />
+                </a>
+              )}
+            </div>
+            <button className="close-btn" onClick={() => setNotification(null)}>×</button>
+          </div>
+        )}
+
+        <div className="network-banner">
+          <AlertTriangle size={16} />
+          <span>Running on <strong>Stacks Testnet</strong>. Please ensure your wallet (Xverse/Leather) is set to Testnet.</span>
+        </div>
         <header className="dashboard-header">
           <div className="title-section">
             <ShieldCheck size={32} className="accent-icon" />
@@ -317,6 +381,18 @@ export const SavingsVault: React.FC = () => {
               <Wallet size={16} />
               <span>{userAddress.slice(0, 6)}...{userAddress.slice(-4)}</span>
             </div>
+            <button
+              className="refresh-btn"
+              onClick={() => {
+                userSession.signUserOut();
+                window.location.reload();
+              }}
+              title="Sign Out"
+              style={{ width: 'auto', padding: '0 0.75rem', gap: '0.5rem' }}
+            >
+              <LogOut size={16} />
+              <span>Sign Out</span>
+            </button>
           </div>
         </header>
 
@@ -503,6 +579,94 @@ export const SavingsVault: React.FC = () => {
           max-width: 1000px;
           margin: 0 auto;
           padding: 0 1.5rem;
+        }
+
+        .notification-banner {
+          position: fixed;
+          top: 80px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 2000;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 1rem 1.5rem;
+          border-radius: 12px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+          width: 90%;
+          max-width: 600px;
+          animation: slideDown 0.3s ease-out;
+        }
+
+        .notification-banner.success {
+          background: #10b981;
+          color: white;
+        }
+
+        .notification-banner.error {
+          background: #ef4444;
+          color: white;
+        }
+
+        .notification-content {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+
+        .notification-content .msg {
+          font-weight: 600;
+        }
+
+        .tx-link {
+          color: rgba(255, 255, 255, 0.9);
+          text-decoration: underline;
+          font-size: 0.875rem;
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+        }
+
+        .tx-link:hover {
+          color: white;
+        }
+
+        .close-btn {
+          background: rgba(255,255,255,0.2);
+          border: none;
+          color: white;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 1.25rem;
+          line-height: 1;
+        }
+
+        .close-btn:hover {
+          background: rgba(255,255,255,0.3);
+        }
+
+        @keyframes slideDown {
+          from { transform: translate(-50%, -20px); opacity: 0; }
+          to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        .network-banner {
+          background: rgba(245, 158, 11, 0.1);
+          border: 1px solid rgba(245, 158, 11, 0.2);
+          color: var(--warning);
+          padding: 0.75rem 1rem;
+          border-radius: 12px;
+          margin-bottom: 2rem;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          font-size: 0.875rem;
         }
 
         .dashboard-header {
