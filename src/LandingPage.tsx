@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useConnect } from '@stacks/connect-react';
-import { authOptions, userSession } from './stacks-config';
+import { authOptions, userSession, CONTRACT_ADDRESS, CONTRACT_NAME } from './stacks-config';
 import { Shield, Zap, BarChart3, ArrowRight, Lock, Repeat, Globe } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -32,10 +32,7 @@ const LandingPage: React.FC = () => {
       <header className="hero">
         <div className="container">
           <div className="hero-content animate-fade-in">
-            <div className="badge">
-              <span className="badge-dot"></span>
-              Secure Stacks Protocol
-            </div>
+
             <h1>Secure Your Future with <span className="gradient-text">SavingsVault</span></h1>
             <p className="hero-description">
               The premier decentralized savings protocol on Stacks. Earn high-yield interest on your STX
@@ -46,7 +43,10 @@ const LandingPage: React.FC = () => {
                 Get Started
                 <ArrowRight size={20} />
               </button>
-              <button className="btn-secondary btn-lg">
+              <button
+                className="btn-secondary btn-lg"
+                onClick={() => window.open(`https://explorer.hiro.so/explorer/contract/${CONTRACT_ADDRESS}.${CONTRACT_NAME}?chain=testnet`, '_blank')}
+              >
                 View Protocol
               </button>
             </div>
@@ -199,14 +199,14 @@ const LandingPage: React.FC = () => {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          background: rgba(99, 102, 241, 0.1);
+          background: rgba(14, 165, 233, 0.1);
           color: var(--accent-primary);
           padding: 0.25rem 0.75rem;
           border-radius: 999px;
           font-size: 0.875rem;
           font-weight: 600;
           margin-bottom: 1.5rem;
-          border: 1px solid rgba(99, 102, 241, 0.2);
+          border: 1px solid rgba(14, 165, 233, 0.2);
         }
 
         .badge-dot {
@@ -386,7 +386,7 @@ const LandingPage: React.FC = () => {
         .feature-icon {
           width: 48px;
           height: 48px;
-          background: rgba(99, 102, 241, 0.1);
+          background: rgba(14, 165, 233, 0.1);
           color: var(--accent-primary);
           border-radius: 12px;
           display: flex;
